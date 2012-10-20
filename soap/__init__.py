@@ -40,7 +40,8 @@ class relationship(SchemaNode):
         else:
             self.typ = Mapping()
 
-        here.add(self._there(name='child', stop_exec=True))
+        child = self._there(name='child', stop_exec=True)
+        self.add(child)
 
         if self._backref:
             self._there.add(here.__class__(name=self._backref, stop_exec=True))
@@ -83,13 +84,13 @@ class SchemaBaseMeta(_SchemaMeta):
 
 
 def mapper(schema):
-    for name, schema in Schema._subs.items():
+    for model in schema._subs:
         for node in schema.__all_schema_nodes__:
             if isinstance(node, relationship):
                 node.map(schema)
 
 
-def initialize_schema(self, *args, **kwargs):
+def new_schema(self, *args, **kwargs):
     super(SchemaNode, self).__init__(*args, **kwargs)
 
     if not kwargs.get('stop_exec', False):
@@ -99,7 +100,7 @@ def initialize_schema(self, *args, **kwargs):
 class Schema(SchemaNode):
     schema_type = Mapping
     __metaclass__ = SchemaBaseMeta
-    __init__ = initialize_schema
+    __new__ = new_schema
 
 
 MappingSchema = Schema
@@ -108,10 +109,10 @@ MappingSchema = Schema
 class TupleSchema(SchemaNode):
     schema_type = Tuple
     __metaclass__ = SchemaBaseMeta
-    __init__ = initialize_schema
+    __new__ = new_schema
 
 
 class MappingSchema(SchemaNode):
     schema_type = Mapping
     __metaclass__ = SchemaBaseMeta
-    __init__ = initialize_schema
+    __new__ = new_schema

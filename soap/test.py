@@ -13,9 +13,10 @@ class A(MappingSchema):
 
 
 class B(MappingSchema):
-    c = relationship('A')
+    c = SchemaNode(Int())
     d = SchemaNode(Int())
+    a = relationship('A', backref='b_dealt', one_to_one=True)
 
 a_deal = A()
-output = a_deal.deserialize({'a': 'blah', 'b': [{'c': {'a': 'blah', 'b': []}, 'd': 1}, {'c': {'a': 'bleep', 'b': []}, 'd': 2}]})
+output = a_deal.deserialize({'a': 'blah', 'b': [{'c': 1, 'd': 1, 'a': {'a': 'asdf', 'b': []}}, {'c': 1, 'd': 2, 'a': {'a': 'haha', 'b': []}}]})
 print(output)
