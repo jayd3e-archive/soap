@@ -33,11 +33,10 @@ class Mapping(object):
             value = validated.get(child.name, None)
             if not value is None:
                 deserialized[child.name] = child.deserialize(value, node, model)
+            elif not child.missing is None:
+                deserialized[child.name] = child.missing
             else:
-                if not child.missing is None:
-                    deserialized[child.name] = child.missing
-                else:
-                    raise Invalid('The field named \'%s\' is missing.' % child.name, child, model)
+                raise Invalid('The field named \'%s\' is missing.' % child.name, child, model)
 
         return deserialized
 
@@ -76,12 +75,14 @@ class Relationship(object):
 
     def deserialize(self, json, node, model):
         inst = model._models[self.model_name]
+
         if self.uselist:
             schema_model = SchemaNode(Sequence(),
                                       inst,
                                       name=node.name)
         else:
             schema_model = inst
+
         return schema_model.deserialize(json, node, model)
 
 
