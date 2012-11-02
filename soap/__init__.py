@@ -68,7 +68,7 @@ class Sequence(object):
 
 
 class Relationship(object):
-    name = ''
+    model_name = ''
 
     def __init__(self, model_name, uselist=True):
         self.model_name = model_name
@@ -101,7 +101,10 @@ class SchemaNode(object):
         self.name = kwargs['name']
         self.missing = kwargs.get('missing', None)
 
-    def deserialize(self, json, node, model):
+    def deserialize(self, json, node=None, model=None):
+        node = node if node else self
+        model = model if model else self
+
         deserialized = self._type.deserialize(json, self, model)
         return deserialized
 
@@ -115,24 +118,15 @@ class SchemaNode(object):
 class SchemaModel(SchemaNode):
     _models = {}
 
-    def __init__(self, name, *args, **kwargs):
+    def __init__(self, model_name, *args, **kwargs):
         self.children = []
 
         if args:
             self._type = args[0]
             self.children = list(args[1:])
 
-        self.name = name
-        self._models[name] = self
+        self.model_name = model_name
+        self._models[model_name] = self
 
     def validate(self, json):
         return self.deserialize(json)
-
-    def deserialize(self, json, node=None, model=None):
-        node = node if node else self
-        model = self
-        # ugly
-        self.name = node.name if node else self.name
-
-        deserialized = self._type.deserialize(json, self, model)
-        return deserialized
