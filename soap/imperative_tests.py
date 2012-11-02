@@ -1,9 +1,10 @@
 from soap import (
+    SchemaModel,
     SchemaNode,
     String,
     Int,
     Mapping,
-    Sequence
+    Relationship
 )
 
 
@@ -12,7 +13,7 @@ json = {
     'name': 'blah',
     'sub_node': {
         'id': 0,
-        'sub_name': 'sub_blah',
+        'name': 'sub_blah',
         'del_key': 'this key should get removed'
     },
     'sub_seq_nodes': [{
@@ -27,21 +28,18 @@ json = {
 }
 
 
-ChildSchema = SchemaNode(Mapping(),
+ChildSchema = SchemaModel('ChildSchema',
+                          Mapping(),
+                          SchemaNode(Int(), name='id'),
+                          SchemaNode(String(), name='name'))
+
+
+TestSchema = SchemaModel('TestSchema',
+                         Mapping(),
                          SchemaNode(Int(), name='id'),
-                         SchemaNode(String(), name='name'))
-
-
-TestSchema = SchemaNode(Mapping(),
-                        SchemaNode(Int(), name='id'),
-                        SchemaNode(String(), name='name'),
-                        SchemaNode(Mapping(),
-                                   SchemaNode(Int(), name='id'),
-                                   SchemaNode(String(), name='sub_name'),
-                                   name='sub_node'),
-                        SchemaNode(Sequence(),
-                                   ChildSchema,
-                                   name='sub_seq_nodes'))
+                         SchemaNode(String(), name='name'),
+                         SchemaNode(Relationship('ChildSchema', uselist=False), name='sub_node'),  # SchemaNode(Mapping(), name='subnode')
+                         SchemaNode(Relationship('ChildSchema'), name='sub_seq_nodes'))
 
 
 payload = TestSchema.validate(json)
