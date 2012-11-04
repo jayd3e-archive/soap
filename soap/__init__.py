@@ -75,6 +75,7 @@ class Relationship(object):
 
     def deserialize(self, json, node, model):
         inst = model._models[self.model_name]
+        inst = inst if isinstance(inst, SchemaModel) else inst()
 
         if self.uselist:
             schema_model = SchemaNode(Sequence(),
@@ -99,7 +100,7 @@ class SchemaNode(object):
             self._type = args[0]
             self.children = list(args[1:])
 
-        self.name = kwargs['name']
+        self.name = kwargs.get('name', '')
         self.missing = kwargs.get('missing', None)
 
     def deserialize(self, json, node=None, model=None):
@@ -116,18 +117,38 @@ class SchemaNode(object):
         return default
 
 
-class SchemaModel(SchemaNode):
+class SchemaModelMeta(type):
     _models = {}
 
-    def __init__(self, model_name, *args, **kwargs):
-        self.children = []
+    def __init__(cls, model_name, bases, clsattrs):
+        if any(isinstance(parent, SchemaModelMeta) for parent in bases):
+            cls.model_name = model_name
+            cls._models[model_name] = cls
+            cls._type = Mapping()
+            cls.children = []
 
+            for key, value in clsattrs.items():
+                if isinstance(value, SchemaNode):
+                    delattr(cls, key)
+
+                    value.name = key if not value.name else value.name
+                    cls.children.append(value)
+
+
+class SchemaModel(SchemaNode):
+    __metaclass__ = SchemaModelMeta
+    _models = {}
+
+    def __init__(self, *args, **kwargs):
         if args:
-            self._type = args[0]
-            self.children = list(args[1:])
+            self.children = []
 
-        self.model_name = model_name
-        self._models[model_name] = self
+            model_name = args[0]
+            self._models[model_name] = self
+            self.model_name = model_name
+
+            self._type = args[1]
+            self.children = list(args[2:])
 
     def validate(self, json):
         return self.deserialize(json)

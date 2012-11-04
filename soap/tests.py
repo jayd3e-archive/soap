@@ -1,21 +1,21 @@
 from soap import (
-    relationship,
+    Relationship,
     String,
     Int,
     SchemaNode,
-    MappingSchema
+    SchemaModel
 )
 
 
-class A(MappingSchema):
+class A(SchemaModel):
     a = SchemaNode(String())
-    b = relationship('B')
+    b = SchemaNode(Relationship('B'), missing=[])
 
 
-class B(MappingSchema):
+class B(SchemaModel):
     c = SchemaNode(Int())
     d = SchemaNode(Int())
-    a = relationship('A', uselist=False)
+    a = SchemaNode(Relationship('A', uselist=False))
 
 
 a_deal = A()

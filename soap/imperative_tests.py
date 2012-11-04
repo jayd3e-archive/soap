@@ -43,7 +43,7 @@ TestSchema = SchemaModel('TestSchema',
                          Mapping(),
                          SchemaNode(Int(), name='id'),
                          SchemaNode(String(), name='name'),
-                         SchemaNode(Relationship('ChildSchema', uselist=False), name='sub_node', missing={}),  # SchemaNode(Mapping(), name='subnode')
+                         SchemaNode(Relationship('ChildSchema', uselist=False), name='sub_node', missing={}),
                          SchemaNode(Relationship('ChildSchema'), name='sub_seq_nodes', missing=[]))
 
 
