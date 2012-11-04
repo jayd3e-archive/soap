@@ -1,3 +1,7 @@
+import re
+import datetime
+from colander import iso8601
+
 falsey = ['', {}, []]
 
 
@@ -29,6 +33,39 @@ class String(object):
             return str(json)
         except Exception:
             raise Invalid('SchemaNode is not an string.', node, model)
+
+
+class DateTime(object):
+    def __init__(self, default_tzinfo=None):
+        if default_tzinfo is None:
+            default_tzinfo = iso8601.Utc()
+        self.default_tzinfo = default_tzinfo
+
+    def deserialize(self, json, node, model):
+        try:
+            result = iso8601.parse_date(json, default_timezone=self.default_tzinfo)
+        except (iso8601.ParseError, TypeError):
+            try:
+                year, month, day = map(int, json.split('-', 2))
+                result = datetime.datetime(year, month, day,
+                                           tzinfo=self.default_tzinfo)
+            except Exception:
+                raise Invalid('SchemaNode is not a datetime', node, model)
+        return result
+
+
+class Boolean(object):
+    def deserialize(self, json, node, model):
+        try:
+            result = str(json)
+        except:
+            raise Invalid('Boolean SchemaNode is not a string', node, model)
+        result = result.lower()
+
+        if result in ('false', '0'):
+            return False
+
+        return True
 
 
 class Mapping(object):
@@ -115,6 +152,43 @@ class Length(object):
                 raise Invalid('Longer than maximum length %s' % self.max, node, model)
 
 
+class Regex(object):
+    def __init__(self, regex, msg=None):
+        if isinstance(regex, basestring):
+            self.match_object = re.compile(regex)
+        else:
+            self.match_object = regex
+        if msg is None:
+            self.msg = 'String does not match expected pattern'
+        else:
+            self.msg = msg
+
+    def __call__(self, value, node, model):
+        if self.match_object.match(value) is None:
+            raise Invalid(self.msg, node, model)
+
+
+class Email(Regex):
+    def __init__(self):
+        msg = 'Invalid email address'
+        super(Email, self).__init__('(?i)^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,4}$', msg=msg)
+
+
+class Range(object):
+    def __init__(self, _min=None, _max=None):
+        self.min = _min
+        self.max = _max
+
+    def __call__(self, value, node, model):
+        if self.min is not None:
+            if value < self.min:
+                raise Invalid('Less than minimum value of %s' % self.min, node, model)
+
+        if self.max is not None:
+            if value > self.max:
+                raise Invalid('Greater than maximum value of %s' % self.max, node, model)
+
+
 #
 # Core
 #
@@ -125,6 +199,7 @@ class SchemaNode(object):
     name = ''
     missing = None
     validator = None
+    preparer = None
 
     def __init__(self, *args, **kwargs):
         self.children = []
@@ -133,9 +208,7 @@ class SchemaNode(object):
             self._type = args[0]
             self.children = list(args[1:])
 
-        self.name = kwargs.get('name', '')
-        self.missing = kwargs.get('missing', None)
-        self.validator = kwargs.get('validator', None)
+        self.__dict__.update(kwargs)
 
     @property
     def required(self):
@@ -152,6 +225,12 @@ class SchemaNode(object):
         if json in falsey and node.required:
             raise Invalid('%s is required.' % node.name, node, model)
 
+        if self.preparer and type(self.preparer) is list:
+            for preparer in self.preparer:
+                deserialized = preparer(deserialized)
+        elif self.preparer:
+            deserialized = self.preparer(deserialized)
+
         if self.validator and type(self.validator) is list:
             for validator in self.validator:
                 validator(json, node, model)
@@ -166,23 +245,34 @@ class SchemaNode(object):
                 return child
         return default
 
+    def __repr__(self):
+        return '<soap.SchemaNode named \'%s\'>' % self.name
+
 
 class SchemaModelMeta(type):
     _models = {}
 
     def __init__(cls, model_name, bases, clsattrs):
         if any(isinstance(parent, SchemaModelMeta) for parent in bases):
+            cls.children = []
             cls.model_name = model_name
             cls._models[model_name] = cls
             cls._type = Mapping()
-            cls.children = []
 
+            # get SchemaNodes from class
             for key, value in clsattrs.items():
                 if isinstance(value, SchemaNode):
                     delattr(cls, key)
 
                     value.name = key if not value.name else value.name
                     cls.children.append(value)
+
+            # get SchemaNodes from bases
+            for _class in reversed(cls.__mro__[1:]):
+                for key, value in _class.__dict__.items():
+                    if isinstance(value, SchemaNode):
+                        value.name = key if not value.name else value.name
+                        cls.children.append(value)
 
 
 class SchemaModel(SchemaNode):
