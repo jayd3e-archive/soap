@@ -28,7 +28,7 @@ class Invalid(Exception):
         self.children.append(exc)
 
     def _keyname(self):
-        if self.pos is not None:
+        if self.positional:
             return str(self.pos)
         return self.node.name
 
@@ -265,15 +265,18 @@ class SchemaNode(object):
 
         deserialized = self._type.deserialize(json, node, model)
 
+        # Run all preparers
         if self.preparer and type(self.preparer) is list:
             for preparer in self.preparer:
                 deserialized = preparer(deserialized)
         elif self.preparer:
             deserialized = self.preparer(deserialized)
 
+        # Make sure the supplied json isn't a falsey value
         if json in falsey and node.required:
             raise Invalid('%s is required.' % node.name, node, model)
 
+        # Run all validators
         excs = []
         if self.validator and type(self.validator) is list:
             for validator in self.validator:
@@ -287,6 +290,7 @@ class SchemaNode(object):
             except Invalid as e:
                 excs.append(e)
 
+        # If we have any validation exception, then raise them as a single exception
         if excs:
             exc = Invalid([e.msg for e in excs], node, model)
             for e in excs:
