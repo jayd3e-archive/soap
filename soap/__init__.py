@@ -1,20 +1,46 @@
 import re
 import datetime
+import pprint
 from colander import iso8601
 
 falsey = ['', {}, []]
 
 
 class Invalid(Exception):
+    pos = None
+    positional = False
+
     def __init__(self, msg, node, model):
         self.msg = msg
         self.node = node
         self.model = model
+        self.children = []
 
     def __str__(self):
-        return 'Invalid(\'%s\', %s, %s)' % (self.msg, self.model, self.node)
+        return pprint.pformat(self.asdict())
 
     __repr__ = __str__
+
+    def add(self, exc, pos=None):
+        if pos is not None:
+            self.positional = True
+            exc.pos = pos
+        self.children.append(exc)
+
+    def _keyname(self):
+        if self.pos is not None:
+            return str(self.pos)
+        return self.node.name
+
+    def asdict(self):
+        if self.children:
+            returned = {}
+            for child in self.children:
+                key = child._keyname()
+                returned[key] = child.asdict()
+            return returned
+
+        return self.msg
 
 
 #
@@ -74,15 +100,24 @@ class Mapping(object):
     def deserialize(self, json, node, model):
         validated = self.validate(json, node, model)
 
+        exc = None
         deserialized = {}
         for child in node.children:
-            value = validated.get(child.name, None)
-            if not value is None:
-                deserialized[child.name] = child.deserialize(value, model=model)
-            elif not child.missing is None:
-                deserialized[child.name] = child.missing
-            else:
-                raise Invalid('The field named \'%s\' is missing.' % child.name, child, model)
+            try:
+                value = validated.get(child.name, None)
+                if not value is None:
+                    deserialized[child.name] = child.deserialize(value, model=model)
+                elif not child.missing is None:
+                    deserialized[child.name] = child.missing
+                else:
+                    raise Invalid('The field named \'%s\' is missing.' % child.name, child, model)
+            except Invalid as e:
+                if exc is None:
+                    exc = Invalid('Mapping Errors', node, model)
+                exc.add(e)
+
+        if exc is not None:
+            raise exc
 
         return deserialized
 
@@ -96,12 +131,20 @@ class Mapping(object):
 class Sequence(object):
     def deserialize(self, json, node, model):
         validated = self.validate(json, node, model)
+        child = node.children[0]
 
+        exc = None
         deserialized = []
-        for value in validated:
-            child = node.children[0]
-            if child:
+        for num, value in enumerate(validated):
+            try:
                 deserialized.append(child.deserialize(value, model=model))
+            except Invalid as e:
+                if exc is None:
+                    exc = Invalid('Sequence Errors', node, model)
+                exc.add(e, num)
+
+        if exc is not None:
+            raise exc
 
         return deserialized
 
@@ -231,11 +274,24 @@ class SchemaNode(object):
         if json in falsey and node.required:
             raise Invalid('%s is required.' % node.name, node, model)
 
+        excs = []
         if self.validator and type(self.validator) is list:
             for validator in self.validator:
-                validator(json, node, model)
+                try:
+                    validator(json, node, model)
+                except Invalid as e:
+                    excs.append(e)
         elif self.validator:
-            self.validator(json, node, model)
+            try:
+                self.validator(json, node, model)
+            except Invalid as e:
+                excs.append(e)
+
+        if excs:
+            exc = Invalid([e.msg for e in excs], node, model)
+            for e in excs:
+                exc.children.extend(e.children)
+            raise exc
 
         return deserialized
 
