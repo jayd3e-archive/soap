@@ -14,6 +14,8 @@ class Invalid(Exception):
     def __str__(self):
         return 'Invalid(\'%s\', %s, %s)' % (self.msg, self.model, self.node)
 
+    __repr__ = __str__
+
 
 #
 # Types
@@ -220,16 +222,14 @@ class SchemaNode(object):
 
         deserialized = self._type.deserialize(json, node, model)
 
-        # preparers logic
-
-        if json in falsey and node.required:
-            raise Invalid('%s is required.' % node.name, node, model)
-
         if self.preparer and type(self.preparer) is list:
             for preparer in self.preparer:
                 deserialized = preparer(deserialized)
         elif self.preparer:
             deserialized = self.preparer(deserialized)
+
+        if json in falsey and node.required:
+            raise Invalid('%s is required.' % node.name, node, model)
 
         if self.validator and type(self.validator) is list:
             for validator in self.validator:
