@@ -84,3 +84,4 @@ try:
     }
 except Invalid as e:
     print(e.asdict())
+    # {'sub_seq_nodes': {'1': {'name': ['This is an error.']}, 'sub_seq_nodes': {'parent_node': {'name': ['This is an error.', 'This is an error too.']}, 'name': ['This is an error.']}}, 'sub_node': {'name': ['name is required.']}}

@@ -10,7 +10,7 @@ class Invalid(Exception):
     pos = None
     positional = False
 
-    def __init__(self, msg, node, model):
+    def __init__(self, msg, node=None, model=None):
         self.msg = msg
         self.node = node
         self.model = model
@@ -28,7 +28,7 @@ class Invalid(Exception):
         self.children.append(exc)
 
     def _keyname(self):
-        if self.positional:
+        if self.pos:
             return str(self.pos)
         return self.node.name
 
@@ -40,7 +40,10 @@ class Invalid(Exception):
                 returned[key] = child.asdict()
             return returned
 
-        return self.msg
+        # so we always return a list
+        if type(self.msg) is list:
+            return self.msg
+        return [self.msg]
 
 
 #
