@@ -51,17 +51,17 @@ class Invalid(Exception):
 #
 
 class Int(object):
-    def deserialize(self, json, node, model):
+    def deserialize(self, value, node, model):
         try:
-            return int(json)
+            return int(value)
         except Exception:
             raise Invalid('SchemaNode is not an integer.', node, model)
 
 
 class String(object):
-    def deserialize(self, json, node, model):
+    def deserialize(self, value, node, model):
         try:
-            return str(json)
+            return str(value)
         except Exception:
             raise Invalid('SchemaNode is not an string.', node, model)
 
@@ -72,12 +72,12 @@ class DateTime(object):
             default_tzinfo = iso8601.Utc()
         self.default_tzinfo = default_tzinfo
 
-    def deserialize(self, json, node, model):
+    def deserialize(self, value, node, model):
         try:
-            result = iso8601.parse_date(json, default_timezone=self.default_tzinfo)
+            result = iso8601.parse_date(value, default_timezone=self.default_tzinfo)
         except (iso8601.ParseError, TypeError):
             try:
-                year, month, day = map(int, json.split('-', 2))
+                year, month, day = map(int, value.split('-', 2))
                 result = datetime.datetime(year, month, day,
                                            tzinfo=self.default_tzinfo)
             except Exception:
@@ -86,9 +86,9 @@ class DateTime(object):
 
 
 class Boolean(object):
-    def deserialize(self, json, node, model):
+    def deserialize(self, value, node, model):
         try:
-            result = str(json)
+            result = str(value)
         except:
             raise Invalid('Boolean SchemaNode is not a string', node, model)
         result = result.lower()
@@ -100,8 +100,8 @@ class Boolean(object):
 
 
 class Mapping(object):
-    def deserialize(self, json, node, model):
-        validated = self.validate(json, node, model)
+    def deserialize(self, value, node, model):
+        validated = self.validate(value, node, model)
 
         exc = None
         deserialized = {}
@@ -124,16 +124,16 @@ class Mapping(object):
 
         return deserialized
 
-    def validate(self, json, node, model):
+    def validate(self, value, node, model):
         try:
-            return dict(json)
+            return dict(value)
         except Exception:
             raise Invalid('SchemaNode is not a mapping type.', node, model)
 
 
 class Sequence(object):
-    def deserialize(self, json, node, model):
-        validated = self.validate(json, node, model)
+    def deserialize(self, value, node, model):
+        validated = self.validate(value, node, model)
         child = node.children[0]
 
         exc = None
@@ -151,9 +151,9 @@ class Sequence(object):
 
         return deserialized
 
-    def validate(self, json, node, model):
+    def validate(self, value, node, model):
         try:
-            return list(json)
+            return list(value)
         except Exception:
             raise Invalid('SchemaNode is not an interable type.', node, model)
 
@@ -165,7 +165,7 @@ class Relationship(object):
         self.model_name = model_name
         self.uselist = uselist
 
-    def deserialize(self, json, node, model):
+    def deserialize(self, value, node, model):
         inst = model._models[self.model_name]
         inst = inst if isinstance(inst, SchemaModel) else inst(name=node.name,
                                                                missing=node.missing)
@@ -178,7 +178,7 @@ class Relationship(object):
         else:
             schema_model = inst
 
-        return schema_model.deserialize(json, model=model)
+        return schema_model.deserialize(value, model=model)
 
 
 #
@@ -262,11 +262,11 @@ class SchemaNode(object):
     def required(self):
         return self.missing is None
 
-    def deserialize(self, json, node=None, model=None):
+    def deserialize(self, value, node=None, model=None):
         node = node if node else self
         model = model if model else self
 
-        deserialized = self._type.deserialize(json, node, model)
+        deserialized = self._type.deserialize(value, node, model)
 
         # Run all preparers
         if self.preparer and type(self.preparer) is list:
@@ -275,8 +275,8 @@ class SchemaNode(object):
         elif self.preparer:
             deserialized = self.preparer(deserialized)
 
-        # Make sure the supplied json isn't a falsey value
-        if json in falsey and node.required:
+        # Make sure the supplied value isn't a falsey value
+        if value in falsey and node.required:
             raise Invalid('%s is required.' % node.name, node, model)
 
         # Run all validators
@@ -284,12 +284,12 @@ class SchemaNode(object):
         if self.validator and type(self.validator) is list:
             for validator in self.validator:
                 try:
-                    validator(json, node, model)
+                    validator(value, node, model)
                 except Invalid as e:
                     excs.append(e)
         elif self.validator:
             try:
-                self.validator(json, node, model)
+                self.validator(value, node, model)
             except Invalid as e:
                 excs.append(e)
 
@@ -355,5 +355,5 @@ class SchemaModel(SchemaNode):
 
         self.__dict__.update(kwargs)
 
-    def validate(self, json):
-        return self.deserialize(json)
+    def validate(self, value):
+        return self.deserialize(value)
