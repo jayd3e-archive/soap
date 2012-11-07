@@ -10,11 +10,9 @@ class Invalid(Exception):
     pos = None
     positional = False
 
-    def __init__(self, msg, payload=None, node=None, model=None):
+    def __init__(self, msg, node):
         self.msg = msg
-        self.payload = payload
         self.node = node
-        self.model = model
         self.children = []
 
     def __str__(self):
@@ -56,7 +54,7 @@ class Int(object):
         try:
             return int(value)
         except Exception:
-            raise Invalid('SchemaNode is not an integer.', payload, node, model)
+            raise Invalid('SchemaNode is not an integer.', node)
 
 
 class String(object):
@@ -64,7 +62,7 @@ class String(object):
         try:
             return str(value)
         except Exception:
-            raise Invalid('SchemaNode is not an string.', payload, node, model)
+            raise Invalid('SchemaNode is not an string.', node)
 
 
 class DateTime(object):
@@ -82,7 +80,7 @@ class DateTime(object):
                 result = datetime.datetime(year, month, day,
                                            tzinfo=self.default_tzinfo)
             except Exception:
-                raise Invalid('SchemaNode is not a datetime', payload, node, model)
+                raise Invalid('SchemaNode is not a datetime', node)
         return result
 
 
@@ -91,7 +89,7 @@ class Boolean(object):
         try:
             result = str(value)
         except:
-            raise Invalid('Boolean SchemaNode is not a string', payload, node, model)
+            raise Invalid('Boolean SchemaNode is not a string', node)
         result = result.lower()
 
         if result in ('false', '0'):
@@ -114,10 +112,10 @@ class Mapping(object):
                 elif not child.missing is None:
                     deserialized[child.name] = child.missing
                 else:
-                    raise Invalid('The field named \'%s\' is missing.' % child.name, payload, child, model)
+                    raise Invalid('The field named \'%s\' is missing.' % child.name, child)
             except Invalid as e:
                 if exc is None:
-                    exc = Invalid('Mapping Errors', payload, node, model)
+                    exc = Invalid('Mapping Errors', node)
                 exc.add(e)
 
         if exc is not None:
@@ -129,7 +127,7 @@ class Mapping(object):
         try:
             return dict(value)
         except Exception:
-            raise Invalid('SchemaNode is not a mapping type.', payload, node, model)
+            raise Invalid('SchemaNode is not a mapping type.', node)
 
 
 class Sequence(object):
@@ -144,7 +142,7 @@ class Sequence(object):
                 deserialized.append(child.deserialize(value, payload=payload, model=model))
             except Invalid as e:
                 if exc is None:
-                    exc = Invalid('Sequence Errors', payload, node, model)
+                    exc = Invalid('Sequence Errors', node)
                 exc.add(e, num)
 
         if exc is not None:
@@ -156,18 +154,18 @@ class Sequence(object):
         try:
             return list(value)
         except Exception:
-            raise Invalid('SchemaNode is not an interable type.', payload, node, model)
+            raise Invalid('SchemaNode is not an interable type.', node)
 
 
 class Relationship(object):
-    model_name = ''
+    name = ''
 
-    def __init__(self, model_name, uselist=True):
-        self.model_name = model_name
+    def __init__(self, name, uselist=True):
+        self.name = name
         self.uselist = uselist
 
     def deserialize(self, value, payload, node, model):
-        inst = model._models[self.model_name]
+        inst = model._models[self.name]
         inst = inst if isinstance(inst, SchemaModel) else inst(name=node.name,
                                                                missing=node.missing)
 
@@ -194,11 +192,11 @@ class Length(object):
     def __call__(self, value, payload, node, model):
         if self.min is not None:
             if len(value) < self.min:
-                raise Invalid('Shorter than minimum length %s' % self.min, payload, node, model)
+                raise Invalid('Shorter than minimum length %s' % self.min, node)
 
         if self.max is not None:
             if len(value) > self.max:
-                raise Invalid('Longer than maximum length %s' % self.max, payload, node, model)
+                raise Invalid('Longer than maximum length %s' % self.max, node)
 
 
 class Regex(object):
@@ -214,7 +212,7 @@ class Regex(object):
 
     def __call__(self, value, payload, node, model):
         if self.match_object.match(value) is None:
-            raise Invalid(self.msg, node, model)
+            raise Invalid(self.msg, node)
 
 
 class Email(Regex):
@@ -231,11 +229,11 @@ class Range(object):
     def __call__(self, value, payload, node, model):
         if self.min is not None:
             if value < self.min:
-                raise Invalid('Less than minimum value of %s' % self.min, payload, node, model)
+                raise Invalid('Less than minimum value of %s' % self.min, node)
 
         if self.max is not None:
             if value > self.max:
-                raise Invalid('Greater than maximum value of %s' % self.max, payload, node, model)
+                raise Invalid('Greater than maximum value of %s' % self.max, node)
 
 
 #
@@ -243,9 +241,9 @@ class Range(object):
 #
 
 class SchemaNode(object):
+    name = ''
     _type = None
     children = None
-    name = ''
     missing = None
     validator = None
     preparer = None
@@ -279,7 +277,7 @@ class SchemaNode(object):
 
         # Make sure the supplied value isn't a falsey value
         if deserialized in falsey and node.required:
-            raise Invalid('%s is required.' % node.name, payload, node, model)
+            raise Invalid('%s is required.' % node.name, node)
 
         # Run all validators
         excs = []
@@ -297,7 +295,7 @@ class SchemaNode(object):
 
         # If we have any validation exception, then raise them as a single exception
         if excs:
-            exc = Invalid([e.msg for e in excs], payload, node, model)
+            exc = Invalid([e.msg for e in excs], node)
             for e in excs:
                 exc.children.extend(e.children)
             raise exc
@@ -317,11 +315,11 @@ class SchemaNode(object):
 class SchemaModelMeta(type):
     _models = {}
 
-    def __init__(cls, model_name, bases, clsattrs):
+    def __init__(cls, name, bases, clsattrs):
         if any(isinstance(parent, SchemaModelMeta) for parent in bases):
             cls.children = []
-            cls.model_name = model_name
-            cls._models[model_name] = cls
+            cls.name = name
+            cls._models[name] = cls
             cls._type = Mapping()
 
             # get SchemaNodes from class
@@ -348,9 +346,8 @@ class SchemaModel(SchemaNode):
         if args:
             self.children = []
 
-            model_name = args[0]
-            self._models[model_name] = self
-            self.model_name = model_name
+            self.name = name = args[0]
+            self._models[name] = self
 
             self._type = args[1]
             self.children = list(args[2:])

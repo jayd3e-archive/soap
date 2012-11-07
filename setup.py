@@ -7,7 +7,8 @@ README = open(os.path.join(here, 'README.md')).read()
 CHANGES = open(os.path.join(here, 'CHANGES.md')).read()
 
 requires = [
-    'colander'
+    'colander',
+    'sphinx'
 ]
 
 tests_require = requires + [
