@@ -7,6 +7,18 @@ falsey = ['', {}, []]
 
 
 class Invalid(Exception):
+    """
+    An exception raised by data types and validators. Requires a mandatory
+    msg and node argument.  The msg is used for conveying what part of the application
+    actually threw the exception and also why the exception was thrown.  The node
+    is used to store off which particular node was being deserialized when the errors
+    was thrown. The node should be an instance of a :class:`soap.SchemaNode`.
+
+
+    Like the SchemaNodes themselves, the Invalid exception is heirarchical.  This means
+    you can add child exceptions to it.  As the exceptions bubble up, they form a
+    mapping of exceptions that is identical to the value being parsed.
+    """
     pos = None
     positional = False
 
@@ -16,22 +28,33 @@ class Invalid(Exception):
         self.children = []
 
     def __str__(self):
+        """  Return a formatted representation of the exception """
         return pprint.pformat(self.asdict())
 
     __repr__ = __str__
 
     def add(self, exc, pos=None):
+        """ Method for adding a child exception.  If a :class:`soap.Sequence` is being
+            parsed and errors are being reported, specify a str for the optional
+            'pos' argument. The 'pos' argument, which is an abbreviation of 'position',
+            represents the index of the :class:`soap.Sequence` element where errors
+            occured. """
         if pos is not None:
             self.positional = True
             exc.pos = pos
         self.children.append(exc)
 
     def _keyname(self):
+        """ Returns the node name of the exception, or the 'pos' argument if it's
+            set.  """
         if self.pos:
             return str(self.pos)
         return self.node.name
 
     def asdict(self):
+        """ Returns a representation of the exception in dict() form.  This is commonly
+            used in the view of the application during error reporting.  The structure
+            of this dict, strictly mimics that of the value that is being deserialized. """
         if self.children:
             returned = {}
             for child in self.children:
@@ -50,6 +73,11 @@ class Invalid(Exception):
 #
 
 class Int(object):
+    """ Represents a Integer datatype in a schema.  Anything that can be cast as a
+        python int() will be deserialized properly. Like all other datatypes, an instance
+        of this class can be passed into a :class:`soap.SchemaNode` to create a SchemaNode
+        of type :class:`soap.Int`. """
+
     def deserialize(self, value, payload, node, model):
         try:
             return int(value)
@@ -58,6 +86,11 @@ class Int(object):
 
 
 class String(object):
+    """ Represents a String datatype in a schema.  Anything that can be cast as a
+        python str() will be deserialized properly. Like all other datatypes, an instance
+        of this class can be passed into a :class:`soap.SchemaNode` to create a SchemaNode
+        of type :class:`soap.String` """
+
     def deserialize(self, value, payload, node, model):
         try:
             return str(value)
@@ -66,6 +99,11 @@ class String(object):
 
 
 class DateTime(object):
+    """ Represents a DateTime datatype in a schema.  This is an identical implementation
+        to colander's DateTime object.  iso8601 is actually a module in colander itself.
+        Like all other datatypes, an instance of this class can be passed into a
+        :class:`soap.SchemaNode` to create a SchemaNode of type :class:`soap.DateTime` """
+
     def __init__(self, default_tzinfo=None):
         if default_tzinfo is None:
             default_tzinfo = iso8601.Utc()
@@ -85,6 +123,11 @@ class DateTime(object):
 
 
 class Boolean(object):
+    """ Represents a Boolean datatype in a schema.  This is evaluated as True, unless
+        the value is equal to 'false' or '0'.  Like all other datatypes, an instance of
+        this class can be passed into a :class:`soap.SchemaNode` to create a SchemaNode
+        of type :class:`soap.Boolean` """
+
     def deserialize(self, value, payload, node, model):
         try:
             result = str(value)
@@ -99,6 +142,15 @@ class Boolean(object):
 
 
 class Mapping(object):
+    """ Represents a Mapping datatype, or a set of key/value pairs in other words.  This datatype
+        is commonly known as dict() in Python or as an object in Javascript.  This datatype
+        takes in a value, and loops through each key/value pair, deserializing each value and
+        assigning the result to the respective key.
+
+        This datatype is also unique in the fact that exceptions that are thrown at lower levels
+        of deserialization, are packaged into a parent exception.  This allows us to represent
+        exceptions in an identical structure as the value being deserialized. """
+
     def deserialize(self, value, payload, node, model):
         validated = self.validate(value, payload, node, model)
 
@@ -124,6 +176,9 @@ class Mapping(object):
         return deserialized
 
     def validate(self, value, payload, node, model):
+        """ Ensures that the value being deserialized is actually a dict() variable.  Will fail if
+            the value past in cannot be cast as a Python dict() """
+
         try:
             return dict(value)
         except Exception:
@@ -131,6 +186,16 @@ class Mapping(object):
 
 
 class Sequence(object):
+    """ Reperesents a Sequence datatype.  This datatype is commonly known as a list() in Python, or
+        an Array() in javascript.  This datatype takes in a Python list(), and loops through each
+        element within it, and deserializes each child element, retaining the order of elements.
+
+        This datatype is unique in the fact that exceptions that are thrown at lower levels of
+        deserialization, are packaged into a parent exception.  This allows us to represent
+        exceptions in an identical structure as the value being deserialized.  We also retain
+        the index count in the sequence, so exceptions are logged specific to an index in the
+        sequence. """
+
     def deserialize(self, value, payload, node, model):
         validated = self.validate(value, payload, node, model)
         child = node.children[0]
@@ -151,6 +216,8 @@ class Sequence(object):
         return deserialized
 
     def validate(self, value, payload, node, model):
+        """ Ensures that we receive a list element during deserialization. """
+
         try:
             return list(value)
         except Exception:
@@ -158,6 +225,16 @@ class Sequence(object):
 
 
 class Relationship(object):
+    """  A datatype that represents a Relationship between two :class:`soap.SchemaModel`s.  This is
+         used during the case where you want to have one :class:`soap.SchemaModel`s include a single instance
+         or a list of instances of another :class:`soap.SchemaModel`s.  In order to have a :class:`SchemaNode`
+         represent a list of instances of a :class:`soap.SchemaModel` called TestSchema, you would have
+         a :class:`soap.SchemaNode` like so, attached to another one of your :class:`soap.SchemaModel`s:
+
+         ... code-block:: python
+
+             test_schema = SchemaNode(Relationship('TestSchema'))
+    """
     name = ''
 
     def __init__(self, name, uselist=True):
@@ -241,6 +318,9 @@ class Range(object):
 #
 
 class SchemaNode(object):
+    """ The main object used to represent each element in a schema.  That element
+        could be a Mapping, Sequence, String, Integer, it doesn't matter.  """
+
     name = ''
     _type = None
     children = None
@@ -262,6 +342,38 @@ class SchemaNode(object):
         return self.missing is None
 
     def deserialize(self, value, payload=None, node=None, model=None):
+        """ Method for deserialization of a specific value of type ``_type``.  This method
+            optionally excepts a ``payload``, a ``node``, and a ``model``.
+
+            The ``payload`` is the original value passed into the :class:`soap.SchemaModel`.
+            We keep track of the payload so our validators can potentially see other values
+            in the schema, to determine if a single :class:`SchemaNode` is correct, as sometimes
+            values depend on one another.
+
+            The ``node`` is the current node being deserialized, and is an instance of
+            :class:`soap.SchemaNode`.  A node should almost never get passed into this function,
+            as we want it to get defaulted to ``self``.  On rare occassions involving Relationships,
+            we want to have a node pass through.  So in this case, we will pass a predetermined
+            node that we want this :class:`soap.SchemaNode` to pretend to be.
+
+            The ``model`` is the :class:`soap.SchemaModel` currently being processed.  We hold
+            onto this, so that aribitrary attributes that were attached to it, can be used in
+            the validators.  For example, in a number of cases, we need a database object to
+            get passed into our validators.  We would pass our db session object into the
+            constructor of a SchemaModel object, like so:
+
+            .. code-block: python
+
+               schema = TestSchema(db=db)
+
+            Then within a validator, we can grab it off of the model object like so:
+
+            .. code-block: python
+
+               def validator(value, payload, node, model):
+                   db = model.db
+        """
+
         node = node if node else self
         model = model if model else self
         payload = payload if payload else value
@@ -293,7 +405,7 @@ class SchemaNode(object):
             except Invalid as e:
                 excs.append(e)
 
-        # If we have any validation exception, then raise them as a single exception
+        # If we have any validation exceptions, then raise them as a single exception
         if excs:
             exc = Invalid([e.msg for e in excs], node)
             for e in excs:
@@ -339,6 +451,10 @@ class SchemaModelMeta(type):
 
 
 class SchemaModel(SchemaNode):
+    """ A superclass of :class:`SchemaNode` that is used to represent the top
+        node in a schema.  This abstraction is necessary, so we know which SchemaNodes
+        to store as 'models,' and which to simply treat as regular model 'fields' """
+
     __metaclass__ = SchemaModelMeta
     _models = {}
 
