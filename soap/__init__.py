@@ -266,6 +266,7 @@ class SchemaNode(object):
     def deserialize(self, value, payload=None, node=None, model=None):
         node = node if node else self
         model = model if model else self
+        payload = payload if payload else value
 
         deserialized = self._type.deserialize(value, payload, node, model)
 
@@ -358,8 +359,3 @@ class SchemaModel(SchemaNode):
 
     def validate(self, value):
         return self.deserialize(value)
-
-    def deserialize(self, value, payload=None, node=None, model=None):
-        payload = value if payload is None else payload
-
-        super(SchemaModel, self).deserialize(value, payload, node, model)
