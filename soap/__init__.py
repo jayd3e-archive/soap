@@ -277,7 +277,7 @@ class SchemaNode(object):
             deserialized = self.preparer(deserialized)
 
         # Make sure the supplied value isn't a falsey value
-        if value in falsey and node.required:
+        if deserialized in falsey and node.required:
             raise Invalid('%s is required.' % node.name, payload, node, model)
 
         # Run all validators
@@ -285,12 +285,12 @@ class SchemaNode(object):
         if self.validator and type(self.validator) is list:
             for validator in self.validator:
                 try:
-                    validator(value, payload, node, model)
+                    validator(deserialized, payload, node, model)
                 except Invalid as e:
                     excs.append(e)
         elif self.validator:
             try:
-                self.validator(value, payload, node, model)
+                self.validator(deserialized, payload, node, model)
             except Invalid as e:
                 excs.append(e)
 
