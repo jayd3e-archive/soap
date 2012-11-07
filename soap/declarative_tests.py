@@ -31,14 +31,14 @@ json = {
 }
 
 
-def test_validator0(value, node, model):
+def test_validator0(value, payload, node, model):
     if not value.startswith('b'):
-        raise Invalid('This is an error.', node, model)
+        raise Invalid('This is an error.', payload, node, model)
 
 
-def test_validator1(value, node, model):
+def test_validator1(value, payload, node, model):
     if value != 'blah':
-        raise Invalid('This is an error too.', node, model)
+        raise Invalid('This is an error too.', payload, node, model)
 
 
 class ChildSchema(SchemaModel):

@@ -10,8 +10,9 @@ class Invalid(Exception):
     pos = None
     positional = False
 
-    def __init__(self, msg, node=None, model=None):
+    def __init__(self, msg, payload=None, node=None, model=None):
         self.msg = msg
+        self.payload = payload
         self.node = node
         self.model = model
         self.children = []
@@ -51,19 +52,19 @@ class Invalid(Exception):
 #
 
 class Int(object):
-    def deserialize(self, value, node, model):
+    def deserialize(self, value, payload, node, model):
         try:
             return int(value)
         except Exception:
-            raise Invalid('SchemaNode is not an integer.', node, model)
+            raise Invalid('SchemaNode is not an integer.', payload, node, model)
 
 
 class String(object):
-    def deserialize(self, value, node, model):
+    def deserialize(self, value, payload, node, model):
         try:
             return str(value)
         except Exception:
-            raise Invalid('SchemaNode is not an string.', node, model)
+            raise Invalid('SchemaNode is not an string.', payload, node, model)
 
 
 class DateTime(object):
@@ -72,7 +73,7 @@ class DateTime(object):
             default_tzinfo = iso8601.Utc()
         self.default_tzinfo = default_tzinfo
 
-    def deserialize(self, value, node, model):
+    def deserialize(self, value, payload, node, model):
         try:
             result = iso8601.parse_date(value, default_timezone=self.default_tzinfo)
         except (iso8601.ParseError, TypeError):
@@ -81,16 +82,16 @@ class DateTime(object):
                 result = datetime.datetime(year, month, day,
                                            tzinfo=self.default_tzinfo)
             except Exception:
-                raise Invalid('SchemaNode is not a datetime', node, model)
+                raise Invalid('SchemaNode is not a datetime', payload, node, model)
         return result
 
 
 class Boolean(object):
-    def deserialize(self, value, node, model):
+    def deserialize(self, value, payload, node, model):
         try:
             result = str(value)
         except:
-            raise Invalid('Boolean SchemaNode is not a string', node, model)
+            raise Invalid('Boolean SchemaNode is not a string', payload, node, model)
         result = result.lower()
 
         if result in ('false', '0'):
@@ -100,8 +101,8 @@ class Boolean(object):
 
 
 class Mapping(object):
-    def deserialize(self, value, node, model):
-        validated = self.validate(value, node, model)
+    def deserialize(self, value, payload, node, model):
+        validated = self.validate(value, payload, node, model)
 
         exc = None
         deserialized = {}
@@ -109,14 +110,14 @@ class Mapping(object):
             try:
                 value = validated.get(child.name, None)
                 if not value is None:
-                    deserialized[child.name] = child.deserialize(value, model=model)
+                    deserialized[child.name] = child.deserialize(value, payload=payload, model=model)
                 elif not child.missing is None:
                     deserialized[child.name] = child.missing
                 else:
-                    raise Invalid('The field named \'%s\' is missing.' % child.name, child, model)
+                    raise Invalid('The field named \'%s\' is missing.' % child.name, payload, child, model)
             except Invalid as e:
                 if exc is None:
-                    exc = Invalid('Mapping Errors', node, model)
+                    exc = Invalid('Mapping Errors', payload, node, model)
                 exc.add(e)
 
         if exc is not None:
@@ -124,26 +125,26 @@ class Mapping(object):
 
         return deserialized
 
-    def validate(self, value, node, model):
+    def validate(self, value, payload, node, model):
         try:
             return dict(value)
         except Exception:
-            raise Invalid('SchemaNode is not a mapping type.', node, model)
+            raise Invalid('SchemaNode is not a mapping type.', payload, node, model)
 
 
 class Sequence(object):
-    def deserialize(self, value, node, model):
-        validated = self.validate(value, node, model)
+    def deserialize(self, value, payload, node, model):
+        validated = self.validate(value, payload, node, model)
         child = node.children[0]
 
         exc = None
         deserialized = []
         for num, value in enumerate(validated):
             try:
-                deserialized.append(child.deserialize(value, model=model))
+                deserialized.append(child.deserialize(value, payload=payload, model=model))
             except Invalid as e:
                 if exc is None:
-                    exc = Invalid('Sequence Errors', node, model)
+                    exc = Invalid('Sequence Errors', payload, node, model)
                 exc.add(e, num)
 
         if exc is not None:
@@ -151,11 +152,11 @@ class Sequence(object):
 
         return deserialized
 
-    def validate(self, value, node, model):
+    def validate(self, value, payload, node, model):
         try:
             return list(value)
         except Exception:
-            raise Invalid('SchemaNode is not an interable type.', node, model)
+            raise Invalid('SchemaNode is not an interable type.', payload, node, model)
 
 
 class Relationship(object):
@@ -165,7 +166,7 @@ class Relationship(object):
         self.model_name = model_name
         self.uselist = uselist
 
-    def deserialize(self, value, node, model):
+    def deserialize(self, value, payload, node, model):
         inst = model._models[self.model_name]
         inst = inst if isinstance(inst, SchemaModel) else inst(name=node.name,
                                                                missing=node.missing)
@@ -178,7 +179,7 @@ class Relationship(object):
         else:
             schema_model = inst
 
-        return schema_model.deserialize(value, model=model)
+        return schema_model.deserialize(value, payload=payload, model=model)
 
 
 #
@@ -190,14 +191,14 @@ class Length(object):
         self.min = _min
         self.max = _max
 
-    def __call__(self, value, node, model):
+    def __call__(self, value, payload, node, model):
         if self.min is not None:
             if len(value) < self.min:
-                raise Invalid('Shorter than minimum length %s' % self.min, node, model)
+                raise Invalid('Shorter than minimum length %s' % self.min, payload, node, model)
 
         if self.max is not None:
             if len(value) > self.max:
-                raise Invalid('Longer than maximum length %s' % self.max, node, model)
+                raise Invalid('Longer than maximum length %s' % self.max, payload, node, model)
 
 
 class Regex(object):
@@ -211,7 +212,7 @@ class Regex(object):
         else:
             self.msg = msg
 
-    def __call__(self, value, node, model):
+    def __call__(self, value, payload, node, model):
         if self.match_object.match(value) is None:
             raise Invalid(self.msg, node, model)
 
@@ -227,14 +228,14 @@ class Range(object):
         self.min = _min
         self.max = _max
 
-    def __call__(self, value, node, model):
+    def __call__(self, value, payload, node, model):
         if self.min is not None:
             if value < self.min:
-                raise Invalid('Less than minimum value of %s' % self.min, node, model)
+                raise Invalid('Less than minimum value of %s' % self.min, payload, node, model)
 
         if self.max is not None:
             if value > self.max:
-                raise Invalid('Greater than maximum value of %s' % self.max, node, model)
+                raise Invalid('Greater than maximum value of %s' % self.max, payload, node, model)
 
 
 #
@@ -262,11 +263,11 @@ class SchemaNode(object):
     def required(self):
         return self.missing is None
 
-    def deserialize(self, value, node=None, model=None):
+    def deserialize(self, value, payload=None, node=None, model=None):
         node = node if node else self
         model = model if model else self
 
-        deserialized = self._type.deserialize(value, node, model)
+        deserialized = self._type.deserialize(value, payload, node, model)
 
         # Run all preparers
         if self.preparer and type(self.preparer) is list:
@@ -277,25 +278,25 @@ class SchemaNode(object):
 
         # Make sure the supplied value isn't a falsey value
         if value in falsey and node.required:
-            raise Invalid('%s is required.' % node.name, node, model)
+            raise Invalid('%s is required.' % node.name, payload, node, model)
 
         # Run all validators
         excs = []
         if self.validator and type(self.validator) is list:
             for validator in self.validator:
                 try:
-                    validator(value, node, model)
+                    validator(value, payload, node, model)
                 except Invalid as e:
                     excs.append(e)
         elif self.validator:
             try:
-                self.validator(value, node, model)
+                self.validator(value, payload, node, model)
             except Invalid as e:
                 excs.append(e)
 
         # If we have any validation exception, then raise them as a single exception
         if excs:
-            exc = Invalid([e.msg for e in excs], node, model)
+            exc = Invalid([e.msg for e in excs], payload, node, model)
             for e in excs:
                 exc.children.extend(e.children)
             raise exc
@@ -357,3 +358,8 @@ class SchemaModel(SchemaNode):
 
     def validate(self, value):
         return self.deserialize(value)
+
+    def deserialize(self, value, payload=None, node=None, model=None):
+        payload = value if payload is None else payload
+
+        super(SchemaModel, self).deserialize(value, payload, node, model)
