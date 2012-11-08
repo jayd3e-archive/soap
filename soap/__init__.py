@@ -20,7 +20,6 @@ class Invalid(Exception):
     mapping of exceptions that is identical to the value being parsed.
     """
     pos = None
-    positional = False
 
     def __init__(self, msg, node):
         self.msg = msg
@@ -40,14 +39,13 @@ class Invalid(Exception):
             represents the index of the :class:`soap.Sequence` element where errors
             occured. """
         if pos is not None:
-            self.positional = True
             exc.pos = pos
         self.children.append(exc)
 
     def _keyname(self):
         """ Returns the node name of the exception, or the 'pos' argument if it's
             set.  """
-        if self.pos:
+        if self.pos is not None:
             return str(self.pos)
         return self.node.name
 
