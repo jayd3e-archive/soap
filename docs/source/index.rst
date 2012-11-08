@@ -17,8 +17,8 @@ Soap allows you to define a number of schemas, and then use those schemas to val
 capable of being configuring schemas both imperatively and declaratively.  Let's take a look at the imperative configuration
 first, it will look something like this:
 
-
 .. code-block:: python
+
     from soap import (
         SchemaMode,
         Mapping,
