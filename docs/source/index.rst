@@ -116,6 +116,12 @@ the following:
 
     schema = TestSchema()
     payload = schema.deserialize(json)
+    # payload = {
+    #     'id': 0,
+    #     'name': 'blah',
+    #     'booly': True,
+    #     'datey': date
+    # }
 
 
 It should be noted that you can use all of Soap's functionality regardless of which configuration style your're using, but for the rest of the docs,
@@ -190,33 +196,33 @@ deserialization:
 
     schema = TestSchema()
     payload = schema.deserialize(json)
-    self.assertEqual(payload, {
-        'id': 0,
-        'name': 'blah',
-        'booly': True,
-        'datey': date,
-        'sub_node': {
-            'id': 0,
-            'name': 'sub_blah',
-            'parent_node': {}
-        },
-        'sub_seq_nodes': [{
-            'id': 0,
-            'name': 'sub_seq_blah_0',
-            'parent_node': {
-                'id': 0,
-                'name': 'blah',
-                'booly': False,
-                'datey': date,
-                'sub_seq_nodes': [],
-                'sub_node': {}
-            }
-        }, {
-            'parent_node': {},
-            'id': 1,
-            'name': 'sub_seq_blah_1'
-        }]
-    })
+    # payload = {
+    #     'id': 0,
+    #     'name': 'blah',
+    #     'booly': True,
+    #     'datey': date,
+    #     'sub_node': {
+    #         'id': 0,
+    #         'name': 'sub_blah',
+    #         'parent_node': {}
+    #     },
+    #     'sub_seq_nodes': [{
+    #         'id': 0,
+    #         'name': 'sub_seq_blah_0',
+    #         'parent_node': {
+    #             'id': 0,
+    #             'name': 'blah',
+    #             'booly': False,
+    #             'datey': date,
+    #             'sub_seq_nodes': [],
+    #             'sub_node': {}
+    #         }
+    #     }, {
+    #         'parent_node': {},
+    #         'id': 1,
+    #         'name': 'sub_seq_blah_1'
+    #     }]
+    # }
 
 
 Validators
