@@ -17,7 +17,7 @@ Soap allows you to define a number of schemas, and then use those schemas to val
 capable of being configuring schemas both imperatively and declaratively.  Let's take a look at the imperative configuration
 first, it will look something like this:
 
-.. code-block: python
+.. code-block:: python
     from soap import (
         SchemaMode,
         Mapping,
@@ -58,7 +58,7 @@ Once a schema is defined, then we want to deserialize it.  This function call wi
 preparers, run all of the specified validators, and make sure all required data is given.  At any point during this process, if something
 fails, a :class:`soap.Invalid` exception is thrown.
 
-.. code-block: python
+.. code-block:: python
     json = {
         'id': '0',
         'name': 'jayd3e'
@@ -80,7 +80,7 @@ Schema Configuration(Declarative)
 If you have ever used SQLAlchemy, you are probably very familiar with the declarative style of model configuration.  With Soap, you can
 configure your schemas in a similar style.  They end up looking something like this:
 
-.. code-block: python
+.. code-block:: python
     from soap import (
         SchemaMode,
         Mapping,
@@ -102,7 +102,7 @@ Here we introduced the declarative style of configuring Soap, as well as a coupl
 These two configuration mechanisms effectively create the same thing, except just using different styles.  To deserialize this schema, we would do
 the following:
 
-.. code-block: python
+.. code-block:: python
     json = {
         'id': 0,
         'name': 'blah',
@@ -113,6 +113,7 @@ the following:
     schema = TestSchema()
     payload = schema.deserialize(json)
 
+
 It should be noted that you can use all of Soap's functionality regardless of which configuration style your're using, but for the rest of the docs,
 I plan on using the declarative style.
 
@@ -122,7 +123,7 @@ Relationships are where Soap really shines in comparison to Colander.  Soap allo
 so you can reuse ALL of your defined schemas.  This is ideal for advanced relationships between data structures.  We can achieve this by creating
 :class:`soap.SchemaNode`s with the :class:`soap.Relationship` type.  To configure some relationships, do something like this:
 
-.. code-block: python
+.. code-block:: python
     from soap import (
         SchemaMode,
         Mapping,
@@ -153,7 +154,7 @@ Notice that in order to specify that we only want a single ChildSchema stored un
 Additionally, we also mention that each ChildSchema should have a ``parent_node`` field that contains a single TestSchema.  This will result in the following
 deserialization:
 
-.. code-block: python
+.. code-block:: python
     json = {
         'id': 0,
         'name': 'blah',
