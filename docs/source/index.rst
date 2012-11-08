@@ -60,6 +60,7 @@ preparers, run all of the specified validators, and make sure all required data 
 fails, a :class:`soap.Invalid` exception is thrown.
 
 .. code-block:: python
+
     json = {
         'id': '0',
         'name': 'jayd3e'
@@ -82,6 +83,7 @@ If you have ever used SQLAlchemy, you are probably very familiar with the declar
 configure your schemas in a similar style.  They end up looking something like this:
 
 .. code-block:: python
+
     from soap import (
         SchemaMode,
         Mapping,
@@ -104,6 +106,7 @@ These two configuration mechanisms effectively create the same thing, except jus
 the following:
 
 .. code-block:: python
+
     json = {
         'id': 0,
         'name': 'blah',
@@ -125,6 +128,7 @@ so you can reuse ALL of your defined schemas.  This is ideal for advanced relati
 :class:`soap.SchemaNode`s with the :class:`soap.Relationship` type.  To configure some relationships, do something like this:
 
 .. code-block:: python
+
     from soap import (
         SchemaMode,
         Mapping,
@@ -156,6 +160,7 @@ Additionally, we also mention that each ChildSchema should have a ``parent_node`
 deserialization:
 
 .. code-block:: python
+
     json = {
         'id': 0,
         'name': 'blah',
