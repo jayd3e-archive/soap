@@ -305,7 +305,7 @@ class TestFunctionalImperative(unittest.TestCase):
                                  SchemaNode(Relationship('ChildSchema', uselist=False), name='sub_node', missing={}),
                                  SchemaNode(Relationship('ChildSchema'), name='sub_seq_nodes', missing=[]))
 
-        payload = TestSchema.validate(json)
+        payload = TestSchema.deserialize(json)
         self.assertEqual(payload, {
             'id': 0,
             'name': 'blah',
