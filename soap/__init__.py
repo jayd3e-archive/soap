@@ -76,7 +76,7 @@ class Int(object):
         of this class can be passed into a :class:`soap.SchemaNode` to create a SchemaNode
         of type :class:`soap.Int`. """
 
-    def deserialize(self, value, payload, node, model):
+    def deserialize(self, value, mapping, node, model):
         try:
             return int(value)
         except Exception:
@@ -89,7 +89,7 @@ class String(object):
         of this class can be passed into a :class:`soap.SchemaNode` to create a SchemaNode
         of type :class:`soap.String` """
 
-    def deserialize(self, value, payload, node, model):
+    def deserialize(self, value, mapping, node, model):
         try:
             return str(value)
         except Exception:
@@ -107,7 +107,7 @@ class DateTime(object):
             default_tzinfo = iso8601.Utc()
         self.default_tzinfo = default_tzinfo
 
-    def deserialize(self, value, payload, node, model):
+    def deserialize(self, value, mapping, node, model):
         try:
             result = iso8601.parse_date(value, default_timezone=self.default_tzinfo)
         except (iso8601.ParseError, TypeError):
@@ -126,7 +126,7 @@ class Boolean(object):
         this class can be passed into a :class:`soap.SchemaNode` to create a SchemaNode
         of type :class:`soap.Boolean` """
 
-    def deserialize(self, value, payload, node, model):
+    def deserialize(self, value, mapping, node, model):
         try:
             result = str(value)
         except:
@@ -149,8 +149,8 @@ class Mapping(object):
         of deserialization, are packaged into a parent exception.  This allows us to represent
         exceptions in an identical structure as the value being deserialized. """
 
-    def deserialize(self, value, payload, node, model):
-        validated = self.validate(value, payload, node, model)
+    def deserialize(self, value, mapping, node, model):
+        validated = self.validate(value, mapping, node, model)
 
         exc = None
         deserialized = {}
@@ -158,7 +158,7 @@ class Mapping(object):
             try:
                 value = validated.get(child.name, None)
                 if not value is None:
-                    deserialized[child.name] = child.deserialize(value, payload=payload, model=model)
+                    deserialized[child.name] = child.deserialize(value, mapping=mapping, model=model)
                 elif not child.missing is None:
                     deserialized[child.name] = child.missing
                 else:
@@ -173,7 +173,7 @@ class Mapping(object):
 
         return deserialized
 
-    def validate(self, value, payload, node, model):
+    def validate(self, value, mapping, node, model):
         """ Ensures that the value being deserialized is actually a dict() variable.  Will fail if
             the value past in cannot be cast as a Python dict() """
 
@@ -194,15 +194,15 @@ class Sequence(object):
         the index count in the sequence, so exceptions are logged specific to an index in the
         sequence. """
 
-    def deserialize(self, value, payload, node, model):
-        validated = self.validate(value, payload, node, model)
+    def deserialize(self, value, mapping, node, model):
+        validated = self.validate(value, mapping, node, model)
         child = node.children[0]
 
         exc = None
         deserialized = []
         for num, value in enumerate(validated):
             try:
-                deserialized.append(child.deserialize(value, payload=payload, model=model))
+                deserialized.append(child.deserialize(value, mapping=value, model=model))
             except Invalid as e:
                 if exc is None:
                     exc = Invalid('Sequence Errors', node)
@@ -213,7 +213,7 @@ class Sequence(object):
 
         return deserialized
 
-    def validate(self, value, payload, node, model):
+    def validate(self, value, mapping, node, model):
         """ Ensures that we receive a list element during deserialization. """
 
         try:
@@ -239,7 +239,7 @@ class Relationship(object):
         self.name = name
         self.uselist = uselist
 
-    def deserialize(self, value, payload, node, model):
+    def deserialize(self, value, mapping, node, model):
         inst = model._models[self.name]
         inst = inst if isinstance(inst, SchemaModel) else inst(name=node.name,
                                                                missing=node.missing)
@@ -252,7 +252,7 @@ class Relationship(object):
         else:
             schema_model = inst
 
-        return schema_model.deserialize(value, payload=payload, model=model)
+        return schema_model.deserialize(value, mapping=value, model=model)
 
 
 #
@@ -264,7 +264,7 @@ class Length(object):
         self.min = _min
         self.max = _max
 
-    def __call__(self, value, payload, node, model):
+    def __call__(self, value, mapping, node, model):
         if self.min is not None:
             if len(value) < self.min:
                 raise Invalid('Shorter than minimum length %s' % self.min, node)
@@ -285,7 +285,7 @@ class Regex(object):
         else:
             self.msg = msg
 
-    def __call__(self, value, payload, node, model):
+    def __call__(self, value, mapping, node, model):
         if self.match_object.match(value) is None:
             raise Invalid(self.msg, node)
 
@@ -301,7 +301,7 @@ class Range(object):
         self.min = _min
         self.max = _max
 
-    def __call__(self, value, payload, node, model):
+    def __call__(self, value, mapping, node, model):
         if self.min is not None:
             if value < self.min:
                 raise Invalid('Less than minimum value of %s' % self.min, node)
@@ -339,12 +339,12 @@ class SchemaNode(object):
     def required(self):
         return self.missing is None
 
-    def deserialize(self, value, payload=None, node=None, model=None):
+    def deserialize(self, value, mapping=None, node=None, model=None):
         """ Method for deserialization of a specific value of type ``_type``.  This method
-            optionally excepts a ``payload``, a ``node``, and a ``model``.
+            optionally excepts a ``mapping``, a ``node``, and a ``model``.
 
-            The ``payload`` is the original value passed into the :class:`soap.SchemaModel`.
-            We keep track of the payload so our validators can potentially see other values
+            The ``mapping`` is the original value passed into the :class:`soap.SchemaModel`.
+            We keep track of the mapping so our validators can potentially see other values
             in the schema, to determine if a single :class:`SchemaNode` is correct, as sometimes
             values depend on one another.
 
@@ -368,15 +368,15 @@ class SchemaNode(object):
 
             .. code-block: python
 
-               def validator(value, payload, node, model):
+               def validator(value, mapping, node, model):
                    db = model.db
         """
 
         node = node if node else self
         model = model if model else self
-        payload = payload if payload else value
+        mapping = mapping if mapping else value
 
-        deserialized = self._type.deserialize(value, payload, node, model)
+        deserialized = self._type.deserialize(value, mapping, node, model)
 
         # Run all preparers
         if self.preparer and type(self.preparer) is list:
@@ -394,12 +394,12 @@ class SchemaNode(object):
         if self.validator and type(self.validator) is list:
             for validator in self.validator:
                 try:
-                    validator(deserialized, payload, node, model)
+                    validator(deserialized, mapping, node, model)
                 except Invalid as e:
                     excs.append(e)
         elif self.validator:
             try:
-                self.validator(deserialized, payload, node, model)
+                self.validator(deserialized, mapping, node, model)
             except Invalid as e:
                 excs.append(e)
 
