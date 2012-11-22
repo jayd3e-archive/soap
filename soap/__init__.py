@@ -70,6 +70,15 @@ class Invalid(Exception):
 # Types
 #
 
+class null(object):
+    """ Represents a null value in soap-related operations. """
+    def __nonzero__(self):
+        return False
+
+    def __repr__(self):
+        return '<soap.null>'
+
+
 class Int(object):
     """ Represents a Integer datatype in a schema.  Anything that can be cast as a
         python int() will be deserialized properly. Like all other datatypes, an instance
@@ -159,7 +168,7 @@ class Mapping(object):
                 value = validated.get(child.name, None)
                 if not value is None:
                     deserialized[child.name] = child.deserialize(value, mapping=mapping, model=model)
-                elif not child.missing is None:
+                elif not child.missing is null:
                     deserialized[child.name] = child.missing
                 else:
                     raise Invalid('The field named \'%s\' is missing.' % child.name, child)
@@ -322,7 +331,7 @@ class SchemaNode(object):
     name = ''
     _type = None
     children = None
-    missing = None
+    missing = null
     validator = None
     preparer = None
 
@@ -337,7 +346,7 @@ class SchemaNode(object):
 
     @property
     def required(self):
-        return self.missing is None
+        return self.missing is null
 
     def deserialize(self, value, mapping=None, node=None, model=None):
         """ Method for deserialization of a specific value of type ``_type``.  This method
