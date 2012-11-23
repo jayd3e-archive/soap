@@ -205,9 +205,13 @@ class Mapping(object):
         return deserialized
 
     def serialize(self, value, depth, mapping, node, model):
+        # called this variable 'validated' just to stay consistent with deserialize
+        validated = value
+
         serialized = {}
         for child in node.children:
-            serialized[child.name] = child.serialize(getattr(value, child.name), depth, mapping=mapping, model=model)
+            value = validated.get(child.name)
+            serialized[child.name] = child.serialize(value, depth, mapping=mapping, model=model)
         return serialized
 
     def validate(self, value, mapping, node, model):
@@ -482,6 +486,17 @@ class SchemaNode(object):
         return deserialized
 
     def serialize(self, value, depth=0, mapping=None, node=None, model=None):
+        """ Method for serialization of a value of type ``_type``.  This method is commonly
+            used to take dict-like objects, like Sqlalchemy models, and turn them into python
+            dicts.
+
+            The ``depth`` is the current level of relationships we are in.  So for example if a
+            parent schema has child nodes.  When we traverse down to the child nodes from the parent,
+            the ``depth`` is incremented from 0 to 1.  Thus, we are at depth 1 of the relationships.
+
+            All of the method definitions for ``deserialize`` still hold true for this method
+            as well.
+        """
         node = node if node else self
         model = model if model else self
         mapping = mapping if mapping else value
