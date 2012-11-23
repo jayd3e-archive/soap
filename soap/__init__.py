@@ -1,4 +1,5 @@
 import re
+import time
 import datetime
 import pprint
 from colander import iso8601
@@ -91,6 +92,11 @@ class Int(object):
         except Exception:
             raise Invalid('SchemaNode is not an integer.', node)
 
+    def serialize(self, value, depth, mapping, node, model):
+        if value:
+            return int(value)
+        return None
+
 
 class String(object):
     """ Represents a String datatype in a schema.  Anything that can be cast as a
@@ -103,6 +109,11 @@ class String(object):
             return str(value)
         except Exception:
             raise Invalid('SchemaNode is not an string.', node)
+
+    def serialize(self, value, depth, mapping, node, model):
+        if value:
+            return str(value)
+        return None
 
 
 class DateTime(object):
@@ -128,6 +139,12 @@ class DateTime(object):
                 raise Invalid('SchemaNode is not a datetime', node)
         return result
 
+    def serialize(self, value, depth, mapping, node, model):
+        if value:
+            dt_str = time.mktime(value.timetuple())
+            return dt_str
+        return None
+
 
 class Boolean(object):
     """ Represents a Boolean datatype in a schema.  This is evaluated as True, unless
@@ -146,6 +163,11 @@ class Boolean(object):
             return False
 
         return True
+
+    def serialize(self, value, depth, mapping, node, model):
+        if value is True:
+            return 'true'
+        return False
 
 
 class Mapping(object):
@@ -181,6 +203,12 @@ class Mapping(object):
             raise exc
 
         return deserialized
+
+    def serialize(self, value, depth, mapping, node, model):
+        serialized = {}
+        for child in node.children:
+            serialized[child.name] = child.serialize(getattr(value, child.name), depth, mapping=mapping, model=model)
+        return serialized
 
     def validate(self, value, mapping, node, model):
         """ Ensures that the value being deserialized is actually a dict() variable.  Will fail if
@@ -222,6 +250,14 @@ class Sequence(object):
 
         return deserialized
 
+    def serialize(self, value, depth, mapping, node, model):
+        child = node.children[0]
+
+        serialized = []
+        for item in value:
+            serialized.append(child.serialize(item, depth, mapping=item, model=model))
+        return serialized
+
     def validate(self, value, mapping, node, model):
         """ Ensures that we receive a list element during deserialization. """
 
@@ -262,6 +298,29 @@ class Relationship(object):
             schema_model = inst
 
         return schema_model.deserialize(value, mapping=value, model=model)
+
+    def serialize(self, value, depth, mapping, node, model):
+        if depth < model.max_depth:
+            # WE MUST GO TO DEEPER DREAM STATE
+            depth += 1
+
+            inst = model._models[self.name]
+            inst = inst if isinstance(inst, SchemaModel) else inst(name=node.name,
+                                                                   missing=node.missing)
+
+            if self.uselist:
+                schema_model = SchemaNode(Sequence(),
+                                          inst,
+                                          name=node.name,
+                                          missing=node.missing)
+            else:
+                schema_model = inst
+
+            return schema_model.serialize(value, depth, mapping=value, model=model)
+        else:
+            if self.uselist:
+                return []
+            return {}
 
 
 #
@@ -334,6 +393,7 @@ class SchemaNode(object):
     missing = null
     validator = None
     preparer = None
+    max_depth = 2
 
     def __init__(self, *args, **kwargs):
         self.children = []
@@ -421,6 +481,14 @@ class SchemaNode(object):
 
         return deserialized
 
+    def serialize(self, value, depth=0, mapping=None, node=None, model=None):
+        node = node if node else self
+        model = model if model else self
+        mapping = mapping if mapping else value
+
+        serialized = self._type.serialize(value, depth, mapping, node, model)
+        return serialized
+
     def get(self, name, default=None):
         for child in self.children:
             if child.name == name:
@@ -479,3 +547,6 @@ class SchemaModel(SchemaNode):
 
     def validate(self, value):
         return self.deserialize(value)
+
+    def jsonify(self, value, depth):
+        return self.serialize(value)
