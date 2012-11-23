@@ -93,7 +93,7 @@ class Int(object):
             raise Invalid('SchemaNode is not an integer.', node)
 
     def serialize(self, value, depth, mapping, node, model):
-        if value:
+        if value is not None:
             return int(value)
         return None
 
@@ -111,7 +111,7 @@ class String(object):
             raise Invalid('SchemaNode is not an string.', node)
 
     def serialize(self, value, depth, mapping, node, model):
-        if value:
+        if value is not None:
             return str(value)
         return None
 
@@ -140,7 +140,7 @@ class DateTime(object):
         return result
 
     def serialize(self, value, depth, mapping, node, model):
-        if value:
+        if value is not None:
             dt_str = time.mktime(value.timetuple())
             return dt_str
         return None
@@ -209,9 +209,11 @@ class Mapping(object):
         validated = value
 
         serialized = {}
-        for child in node.children:
-            value = validated.get(child.name)
-            serialized[child.name] = child.serialize(value, depth, mapping=mapping, model=model)
+        # sometimes 'validated' is equal to None, when a non-list relationship is empty
+        if validated:
+            for child in node.children:
+                value = validated.get(child.name)
+                serialized[child.name] = child.serialize(value, depth, mapping=mapping, model=model)
         return serialized
 
     def validate(self, value, mapping, node, model):

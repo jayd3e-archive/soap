@@ -18,13 +18,15 @@ date_str = '2007-01-25T12:00:00Z'
 date = datetime(2007, 1, 25, 12, 0, tzinfo=iso8601.Utc())
 
 
-class TestFunctionalDeclarative(unittest.TestCase):
+class TestFunctional(unittest.TestCase):
     def setUp(self):
         from soap import SchemaModelMeta
         from soap import SchemaModel
         SchemaModelMeta._models = {}
         SchemaModel._models = {}
 
+
+class TestFunctionalDeclarative(TestFunctional):
     def test_scenario_no_relationships(self):
         class SchemaOne(SchemaModel):
             id = SchemaNode(Int())
@@ -266,8 +268,7 @@ class TestFunctionalDeclarative(unittest.TestCase):
         })
 
 
-class TestFunctionalImperative(unittest.TestCase):
-
+class TestFunctionalImperative(TestFunctional):
     def test_scenario_relationships(self):
         json = {
             'id': 0,
@@ -329,4 +330,168 @@ class TestFunctionalImperative(unittest.TestCase):
                 'id': 0,
                 'name': 'sub_blah'
             }
+        })
+
+
+class TestModelSerialization(TestFunctional):
+    def setUp(self):
+        # Dict-like object, represents a Sqlalchemy model
+        class DictLikeObject(object):
+            numy = None
+            stringy = None
+            datey = None
+            booley = None
+            noney = None
+            sub_objs = None
+            sub_obj = None
+
+            def __init__(self):
+                self.numy = 0
+                self.stringy = 'Cool Object'
+                self.datey = date
+                self.booley = False
+                self.sub_objs = []
+
+            def __getitem__(self, key, default=None):
+                return getattr(self, key)
+
+            get = __getitem__
+
+            def __setitem__(self, key):
+                return setattr(self, key)
+
+        dict_like_object = DictLikeObject()
+
+        # Children of main object
+        child_0 = DictLikeObject()
+        child_1 = DictLikeObject()
+        for obj in [child_0, child_1]:
+            for i in range(2):
+                obj.sub_objs.append(DictLikeObject())
+
+            # add the children to the main object
+            dict_like_object.sub_objs.append(obj)
+
+        dict_like_object.sub_obj = child_0
+
+        self.obj = dict_like_object
+
+    def test_serialization_default_level(self):
+        self.maxDiff = None
+
+        # Main Schema
+        class DictLikeObjectSchema(SchemaModel):
+            numy = SchemaNode(Int())
+            stringy = SchemaNode(String())
+            datey = SchemaNode(DateTime())
+            booley = SchemaNode(Boolean())
+            noney = SchemaNode(String())
+            sub_objs = SchemaNode(Relationship('DictLikeObjectSchema'), missing=[])
+            sub_obj = SchemaNode(Relationship('DictLikeObjectSchema', uselist=False), missing={})
+
+        schema = DictLikeObjectSchema()
+        payload = schema.serialize(self.obj)
+        self.assertEqual(payload, {
+            'booley': False,
+            'datey': 1169726400.0,
+            'noney': None,
+            'numy': 0,
+            'stringy': 'Cool Object',
+            'sub_obj': {
+                'booley': False,
+                'datey': 1169726400.0,
+                'noney': None,
+                'numy': 0,
+                'stringy': 'Cool Object',
+                'sub_obj': {},
+                'sub_objs': [{
+                    'booley': False,
+                    'datey': 1169726400.0,
+                    'noney': None,
+                    'numy': 0,
+                    'stringy': 'Cool Object',
+                    'sub_obj': {},
+                    'sub_objs': []
+                }, {
+                    'booley': False,
+                    'datey': 1169726400.0,
+                    'noney': None,
+                    'numy': 0,
+                    'stringy': 'Cool Object',
+                    'sub_obj': {},
+                    'sub_objs': []
+                }
+            ]},
+            'sub_objs': [{
+                'booley': False,
+                'datey': 1169726400.0,
+                'noney': None,
+                'numy': 0,
+                'stringy': 'Cool Object',
+                'sub_obj': {},
+                'sub_objs': [{
+                    'booley': False,
+                    'datey': 1169726400.0,
+                    'noney': None,
+                    'numy': 0,
+                    'stringy': 'Cool Object',
+                    'sub_obj': {},
+                    'sub_objs': []
+                }, {
+                    'booley': False,
+                    'datey': 1169726400.0,
+                    'noney': None,
+                    'numy': 0,
+                    'stringy': 'Cool Object',
+                    'sub_obj': {},
+                    'sub_objs': []
+                }]
+            }, {
+                'booley': False,
+                'datey': 1169726400.0,
+                'noney': None,
+                'numy': 0,
+                'stringy': 'Cool Object',
+                'sub_obj': {},
+                'sub_objs': [{
+                    'booley': False,
+                    'datey': 1169726400.0,
+                    'noney': None,
+                    'numy': 0,
+                    'stringy': 'Cool Object',
+                    'sub_obj': {},
+                    'sub_objs': []
+                }, {
+                    'booley': False,
+                    'datey': 1169726400.0,
+                    'noney': None,
+                    'numy': 0,
+                    'stringy': 'Cool Object',
+                    'sub_obj': {},
+                    'sub_objs': []
+                }]
+            }]
+        })
+
+    def test_serialization_level_0(self):
+        # Main Schema
+        class DictLikeObjectSchema(SchemaModel):
+            numy = SchemaNode(Int())
+            stringy = SchemaNode(String())
+            datey = SchemaNode(DateTime())
+            booley = SchemaNode(Boolean())
+            noney = SchemaNode(String())
+            sub_objs = SchemaNode(Relationship('DictLikeObjectSchema'), missing=[])
+            sub_obj = SchemaNode(Relationship('DictLikeObjectSchema', uselist=False), missing={})
+
+        schema = DictLikeObjectSchema(max_depth=0)
+        payload = schema.serialize(self.obj)
+        self.assertEqual(payload, {
+            'booley': False,
+            'datey': 1169726400.0,
+            'noney': None,
+            'numy': 0,
+            'stringy': 'Cool Object',
+            'sub_obj': {},
+            'sub_objs': []
         })
